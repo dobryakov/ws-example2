@@ -33,6 +33,11 @@
 
 [Gates determined based on constitution file]
 
+- docker-compose present and used for build/run/test
+- `.env` values consumed (host non-localhost, ports ≥ 9000)
+- Tests defined for this task/feature and runnable via `docker compose`
+- Logging sufficient for debugging via `docker compose logs`
+
 ## Project Structure
 
 ### Documentation (this feature)
