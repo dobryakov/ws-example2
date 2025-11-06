@@ -1,0 +1,39 @@
+openapi: 3.0.3
+info:
+  title: WS Demo Backend API
+  version: 1.0.0
+servers:
+  - url: http://{host}:{port}
+    variables:
+      host:
+        default: example.local
+      port:
+        default: '9001'
+paths:
+  /api/enqueue:
+    post:
+      summary: Enqueue message for a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, text]
+              properties:
+                userId:
+                  type: string
+                  description: GUID of the target user
+                text:
+                  type: string
+                  description: Arbitrary length text message
+      responses:
+        '202':
+          description: Accepted
+        '400':
+          description: Invalid userId
+        '500':
+          description: Server error
+components:
+  schemas: {}
+
