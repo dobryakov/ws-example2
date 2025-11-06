@@ -1,0 +1,40 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install system dependencies for Playwright
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    freetype-dev \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont
+
+# Set Playwright to use system Chromium
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
+# Copy package files
+COPY backend/package*.json ./backend/
+COPY backend/tsconfig.json ./backend/
+COPY tests/package*.json ./tests/
+
+# Install dependencies
+WORKDIR /app/backend
+RUN npm ci
+
+WORKDIR /app/tests
+RUN npm ci
+
+# Install Playwright browsers (using system Chromium)
+RUN npx playwright install chromium --with-deps || true
+
+# Copy test files
+COPY tests/ ./tests/
+COPY backend/ ./backend/
+
+# Run tests
+CMD ["npm", "test"]
+
