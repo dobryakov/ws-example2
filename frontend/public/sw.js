@@ -4,16 +4,22 @@
  */
 
 // Use relative URL for Socket.IO - will be proxied through nginx
-// In test environment, nginx proxies /socket.io/ to backend
-// In production, BACKEND_HOST and BACKEND_PORT are used
-const BACKEND_HOST = '${BACKEND_HOST}' || 'example.local';
-const BACKEND_PORT = '${BACKEND_PORT}' || '9001';
-// Use relative URL (empty string) if BACKEND_HOST is 'backend' (Docker internal name)
+// In production, nginx proxies /socket.io/ to backend
+// Always use relative URL (empty string) to let nginx proxy the connection
 // Socket.IO will use current origin, which will be proxied by nginx
-// Otherwise use full URL
-const BACKEND_URL = BACKEND_HOST === 'backend' 
-  ? '' // Empty string = use current origin (will be proxied by nginx)
-  : `http://${BACKEND_HOST}:${BACKEND_PORT}`;
+const BACKEND_HOST = '${BACKEND_HOST}' || 'backend';
+const BACKEND_PORT = '${BACKEND_PORT}' || '9001';
+// Always use relative URL in production - nginx will proxy /socket.io/ to backend
+// This ensures connection works regardless of hostname/port configuration
+const BACKEND_URL = ''; // Empty string = use current origin (will be proxied by nginx)
+
+// Diagnostic logging
+console.log('[SW] Configuration:', {
+  BACKEND_HOST,
+  BACKEND_PORT,
+  BACKEND_URL: BACKEND_URL || '(current origin - proxied by nginx)',
+  location: self.location.href
+});
 
 // Import Socket.IO client (will be loaded from CDN or bundled)
 // Load Socket.IO client synchronously at SW initialization
@@ -106,7 +112,14 @@ async function connect() {
     });
     
     socket.on('connect_error', (error) => {
-      console.error('[SW] Socket.IO connection error:', error?.message || error);
+      console.error('[SW] Socket.IO connection error:', {
+        message: error?.message || error,
+        type: error?.type,
+        description: error?.description,
+        context: error?.context,
+        BACKEND_URL: BACKEND_URL || '(current origin)',
+        location: self.location.href
+      });
       messageChannel.postMessage({ type: 'status', data: { connected: false } });
       
       // Schedule reconnection
