@@ -18,9 +18,15 @@ const HOST = process.env.HOST || 'example.local';
 const PORT = parseInt(process.env.BACKEND_PORT || '9001', 10);
 
 // CORS configuration
+// In test environment, HOST might be 'frontend' (Docker internal name)
+// Allow both the direct origin and any origin (for proxy scenarios)
+const allowedOrigins = process.env.NODE_ENV === 'test' 
+  ? true // Allow all origins in test (via nginx proxy)
+  : `http://${HOST}:${process.env.FRONTEND_PORT || '9000'}`;
+
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: `http://${HOST}:${process.env.FRONTEND_PORT || '9000'}`,
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST']
   },
@@ -31,11 +37,16 @@ const io = new SocketIOServer(httpServer, {
 (global as any).io = io;
 
 // Middleware
+// In test environment, allow all origins (via nginx proxy)
+const corsOrigin = process.env.NODE_ENV === 'test'
+  ? true // Allow all origins in test
+  : `http://${HOST}:${process.env.FRONTEND_PORT || '9000'}`;
+
 app.use(cors({
-  origin: `http://${HOST}:${process.env.FRONTEND_PORT || '9000'}`,
+  origin: corsOrigin,
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '256kb' }));
 app.use(cookieParser());
 
 // API routes

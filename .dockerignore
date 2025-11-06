@@ -39,7 +39,7 @@ Thumbs.db
 # Testing
 coverage/
 .nyc_output/
-tests/
+# tests/ - commented out, needed for test Dockerfile
 
 # Docker
 .docker/

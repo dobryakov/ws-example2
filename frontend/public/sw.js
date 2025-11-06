@@ -3,13 +3,41 @@
  * Maintains single Socket.IO connection and broadcasts messages to all pages
  */
 
-const BACKEND_HOST = '${BACKEND_HOST:-example.local}';
-const BACKEND_PORT = '${BACKEND_PORT:-9001}';
-const BACKEND_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}`;
+// Use relative URL for Socket.IO - will be proxied through nginx
+// In test environment, nginx proxies /socket.io/ to backend
+// In production, BACKEND_HOST and BACKEND_PORT are used
+const BACKEND_HOST = '${BACKEND_HOST}' || 'example.local';
+const BACKEND_PORT = '${BACKEND_PORT}' || '9001';
+// Use relative URL (empty string) if BACKEND_HOST is 'backend' (Docker internal name)
+// Socket.IO will use current origin, which will be proxied by nginx
+// Otherwise use full URL
+const BACKEND_URL = BACKEND_HOST === 'backend' 
+  ? '' // Empty string = use current origin (will be proxied by nginx)
+  : `http://${BACKEND_HOST}:${BACKEND_PORT}`;
 
 // Import Socket.IO client (will be loaded from CDN or bundled)
-// For now, we'll use dynamic import
-let io = null;
+// Load Socket.IO client synchronously at SW initialization
+// This must be done synchronously, not in async function
+try {
+  const scriptPath = 'js/socket.io.min.js';
+  const socketIoUrl = new URL(scriptPath, self.location);
+  console.log('[SW] Loading Socket.IO client at initialization', socketIoUrl.href);
+  importScripts(socketIoUrl.href);
+  var io = self.io || globalThis.io;
+  console.log('[SW] Socket.IO client loaded at init:', !!io, { 
+    hasSelfIo: !!self.io, 
+    hasGlobalIo: !!globalThis.io,
+    ioType: typeof io
+  });
+} catch (importErr) {
+  console.error('[SW] Failed to load Socket.IO client at initialization', importErr, {
+    name: importErr.name,
+    message: importErr.message,
+    stack: importErr.stack
+  });
+  var io = null;
+}
+
 let socket = null;
 let reconnectAttempts = 0;
 let reconnectTimer = null;
@@ -37,11 +65,11 @@ function getBackoffDelay(attempt) {
  */
 async function connect() {
   try {
-    // Import socket.io-client dynamically
+    console.log('[SW] connect() start', { BACKEND_URL, location: self.location.href, hasIo: !!io });
+    // Check if Socket.IO client is available
     if (!io) {
-      // Use importScripts for service worker
-      importScripts('https://cdn.socket.io/4.7.2/socket.io.min.js');
-      io = self.io;
+      console.error('[SW] Socket.IO client not available, cannot connect');
+      throw new Error('Socket.IO client not loaded');
     }
     
     if (socket) {
@@ -53,6 +81,7 @@ async function connect() {
       return;
     }
     
+    console.log('[SW] Attempting Socket.IO connect to', BACKEND_URL || '(current origin)');
     socket = io(BACKEND_URL, {
       transports: ['websocket', 'polling'], // Enable fallback to long-polling
       reconnection: false, // We handle reconnection manually
@@ -77,7 +106,7 @@ async function connect() {
     });
     
     socket.on('connect_error', (error) => {
-      console.error('[SW] Socket.IO connection error:', error);
+      console.error('[SW] Socket.IO connection error:', error?.message || error);
       messageChannel.postMessage({ type: 'status', data: { connected: false } });
       
       // Schedule reconnection
@@ -122,9 +151,11 @@ function scheduleReconnect() {
  */
 messageChannel.onmessage = (event) => {
   const { type, data } = event.data;
+  console.log('[SW] Received message from page:', { type, data });
   
   if (type === 'getStatus') {
     // Send current status
+    console.log('[SW] getStatus request, current socket state:', { hasSocket: !!socket, connected: socket?.connected });
     messageChannel.postMessage({
       type: 'status',
       data: { connected: socket && socket.connected }
@@ -135,7 +166,10 @@ messageChannel.onmessage = (event) => {
     console.log('[SW] Received GUID from page:', userGUID);
     // Connect if not already connected
     if (!socket || !socket.connected) {
+      console.log('[SW] Starting connection with GUID:', userGUID);
       connect();
+    } else {
+      console.log('[SW] Already connected, skipping');
     }
   }
 };
@@ -154,8 +188,9 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   console.log('[SW] Service Worker activating');
   event.waitUntil(self.clients.claim()); // Take control of all pages
-  // Start connection
-  connect();
+  // Don't connect here - wait for GUID from page
+  // connect() will be called when GUID is received via messageChannel
+  console.log('[SW] Activated, waiting for GUID from page');
 });
 
 /**

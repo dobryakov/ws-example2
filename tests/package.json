@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "E2E tests for WebSocket Demo",
   "scripts": {
-    "test": "playwright test",
+    "test": "playwright test $PW_ARGS",
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug"
   },

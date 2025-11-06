@@ -5,12 +5,22 @@
 import { test, expect } from '@playwright/test';
 
 const HOST = process.env.HOST || 'example.local';
+const FRONTEND_PORT = process.env.FRONTEND_PORT || '9000';
+const BACKEND_HOST = process.env.BACKEND_HOST || HOST;
 const BACKEND_PORT = process.env.BACKEND_PORT || '9001';
-const BACKEND_URL = `http://${HOST}:${BACKEND_PORT}`;
+
+// In test environment with network_mode: service:frontend, use localhost:80
+const BASE_URL = HOST === 'localhost'
+  ? `http://localhost:80`
+  : `http://${HOST}:${FRONTEND_PORT}`;
+// For API calls, use frontend URL (proxied through nginx) in test environment
+const BACKEND_URL = HOST === 'localhost'
+  ? BASE_URL
+  : `http://${BACKEND_HOST}:${BACKEND_PORT}`;
 
 test.describe('Connection Reliability', () => {
   test('should reconnect after network interruption', async ({ page, context }) => {
-    await page.goto('/index1.html');
+    await page.goto(`${BASE_URL}/index1.html`);
     const guidDisplay = page.locator('#guidDisplay');
     await expect(guidDisplay).toBeVisible();
     const guid = await guidDisplay.textContent();
@@ -31,7 +41,7 @@ test.describe('Connection Reliability', () => {
   });
 
   test('should deliver messages after reconnection', async ({ page, context }) => {
-    await page.goto('/index1.html');
+    await page.goto(`${BASE_URL}/index1.html`);
     const guidDisplay = page.locator('#guidDisplay');
     await expect(guidDisplay).toBeVisible();
     const guid = await guidDisplay.textContent();
