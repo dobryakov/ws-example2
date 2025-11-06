@@ -12,8 +12,6 @@ services:
       - BACKEND_PORT=${BACKEND_PORT:-9001}
     env_file:
       - ../.env
-    volumes:
-      - ../backend:/app/backend:ro
     command: npm start
     restart: unless-stopped
     networks:
@@ -32,18 +30,19 @@ services:
     ports:
       - "${FRONTEND_PORT:-9000}:80"
     environment:
-      - BACKEND_HOST=${HOST:-example.local}
+      - BACKEND_HOST=${BACKEND_HOST:-backend}
       - BACKEND_PORT=${BACKEND_PORT:-9001}
     env_file:
       - ../.env
-    volumes:
-      - ../frontend/public:/usr/share/nginx/html:ro
     restart: unless-stopped
     networks:
       - ws-demo-network
     depends_on:
-      - backend
-    entrypoint: ["/bin/sh", "-c", "envsubst '$$BACKEND_HOST $$BACKEND_PORT' < /usr/share/nginx/html/sw.js > /tmp/sw.js && mv /tmp/sw.js /usr/share/nginx/html/sw.js && nginx -g 'daemon off;'"]
+      backend:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c", "envsubst '$$BACKEND_HOST $$BACKEND_PORT' < /usr/share/nginx/html/sw.js > /tmp/sw.js && mv /tmp/sw.js /usr/share/nginx/html/sw.js && envsubst '$$BACKEND_PORT' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
+    volumes:
+      - ../compose/nginx.prod.conf.template:/etc/nginx/templates/default.conf.template:ro
 
 networks:
   ws-demo-network:

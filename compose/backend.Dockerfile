@@ -6,9 +6,9 @@ WORKDIR /app
 COPY backend/package*.json ./backend/
 COPY backend/tsconfig.json ./backend/
 
-# Install dependencies (including dev dependencies for ts-node)
+# Install dependencies (including dev dependencies for tsx)
 WORKDIR /app/backend
-RUN npm install
+RUN npm install --include=dev
 
 # Copy source code
 COPY backend/src ./src
