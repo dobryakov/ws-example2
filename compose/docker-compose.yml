@@ -43,7 +43,26 @@ services:
     volumes:
       - ../compose/nginx.prod.conf.template:/etc/nginx/templates/default.conf.template:ro
 
+  caddy:
+    image: caddy:latest
+    container_name: ws-demo-caddy
+    ports:
+      - "${CADDY_PORT:-9010}:9010"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    networks:
+      - ws-demo-network
+    depends_on:
+      - frontend
+
 networks:
   ws-demo-network:
     driver: bridge
 
+volumes:
+  caddy_data:
+    external: true
+  caddy_config:
